@@ -30,7 +30,8 @@
     }
 
     body {
-      min-height: 100vh;
+      min-height: 117.65vh;
+      zoom: 0.85;
     }
 
     button, input, select {
@@ -189,6 +190,14 @@
       box-shadow: inset 0 -1px 0 rgba(255,255,255,.10);
     }
 
+    .task-pill.no-color {
+      border-radius: 0;
+      background: transparent;
+      color: var(--text);
+      padding-inline: 0;
+      box-shadow: none;
+    }
+
     .task-text {
       min-width: 0;
       overflow: hidden;
@@ -279,16 +288,10 @@
       display: grid;
       place-items: center;
       border-radius: 999px;
-      border: 1.5px solid color-mix(in srgb, var(--text) 16%, transparent);
-      background: color-mix(in srgb, var(--task-brush-color, var(--reminder-default)) 16%, var(--surface-2));
+      border: 1.5px solid color-mix(in srgb, var(--text) 20%, transparent);
+      background: var(--task-brush-color, #ffffff);
+      box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--surface-2) 45%, transparent);
       pointer-events: none;
-    }
-
-    .color-swatch svg {
-      width: 16px;
-      height: 16px;
-      color: var(--task-brush-color, var(--reminder-default));
-      display: block;
     }
 
     .task-color-input {
@@ -322,14 +325,19 @@
     }
 
     .add-button {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
       min-height: 42px;
       border: 0;
       border-radius: 999px;
       background: var(--accent);
       color: var(--accent-contrast);
-      padding: 0 16px;
+      padding: 0;
       cursor: pointer;
-      font-weight: 800;
+      font-size: 1.1rem;
+      font-weight: 900;
     }
 
     .week-grid {
@@ -383,6 +391,14 @@
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
       overflow: hidden;
+    }
+
+    .week-task.no-color {
+      min-height: 28px;
+      border-radius: 0;
+      background: transparent;
+      color: var(--text);
+      padding-inline: 0;
     }
 
     .week-task.completed {
@@ -450,6 +466,14 @@
       overflow: hidden;
       text-overflow: ellipsis;
       box-shadow: inset 0 -1px 0 rgba(255,255,255,.10);
+    }
+
+    .month-task.no-color {
+      border-radius: 0;
+      background: transparent;
+      color: var(--text);
+      padding-inline: 0;
+      box-shadow: none;
     }
 
     .month-task.completed {
@@ -720,6 +744,15 @@
       opacity: 1;
     }
 
+    .palette-color.no-color {
+      background: #ffffff;
+    }
+
+    .palette-color.no-color::after {
+      color: #111111;
+      text-shadow: none;
+    }
+
     .custom-color-row {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -783,18 +816,6 @@
       display: none;
     }
 
-    .color-swatch::after {
-      content: "";
-      position: absolute;
-      right: 7px;
-      bottom: 7px;
-      width: 7px;
-      height: 7px;
-      border-radius: 999px;
-      background: var(--task-brush-color, var(--reminder-default));
-      box-shadow: 0 0 0 2px var(--surface-2);
-      opacity: .95;
-    }
 
     @media (max-width: 650px) {
       .app {
@@ -956,10 +977,6 @@
           <label for="accentColor">Accent color</label>
           <input class="setting-color" id="accentColor" type="color" />
         </div>
-        <div class="setting-row">
-          <label for="defaultReminderColor">Default reminder bubble</label>
-          <input class="setting-color" id="defaultReminderColor" type="color" />
-        </div>
       </div>
 
       <div class="setting-group">
@@ -1059,7 +1076,6 @@
         textColor: document.getElementById("textColor"),
         mutedTextColor: document.getElementById("mutedTextColor"),
         accentColor: document.getElementById("accentColor"),
-        defaultReminderColor: document.getElementById("defaultReminderColor"),
         clearAllButton: document.getElementById("clearAllButton"),
         themeButtons: [...document.querySelectorAll("[data-theme]")],
         colorPickerModal: document.getElementById("colorPickerModal"),
@@ -1076,7 +1092,7 @@
       let currentView = "day";
       let selectedDate = startOfDay(new Date());
       let currentMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-      let activeColorSelection = settings.reminderDefault;
+      let activeColorSelection = null;
       let activeColorCallback = null;
 
       normalizeTasks();
@@ -1169,13 +1185,19 @@
       }
 
       function normalizeTasks() {
+        let changed = false;
+
         Object.values(data.tasksByDate).forEach(tasks => {
           if (!Array.isArray(tasks)) return;
           tasks.forEach(task => {
-            if (!task.color) task.color = settings.reminderDefault;
+            if (!("color" in task)) {
+              task.color = null;
+              changed = true;
+            }
           });
         });
-        saveData();
+
+        if (changed) saveData();
       }
 
       function getTasks(date) {
@@ -1202,7 +1224,6 @@
         el.textColor.value = settings.text;
         el.mutedTextColor.value = settings.muted;
         el.accentColor.value = settings.accent;
-        el.defaultReminderColor.value = settings.reminderDefault;
         el.settingsButton.textContent = "U";
       }
 
@@ -1273,12 +1294,14 @@
 
       function createTaskRow(day, task) {
         const row = document.createElement("div");
+        const hasColor = Boolean(task.color);
+        const taskColor = task.color || settings.accent;
         row.className = `task-row${task.completed ? " completed" : ""}`;
-        row.style.setProperty("--task-color", task.color || settings.reminderDefault);
-        row.style.setProperty("--task-text-color", getContrastTextColor(task.color || settings.reminderDefault));
+        row.style.setProperty("--task-color", taskColor);
+        row.style.setProperty("--task-text-color", getContrastTextColor(taskColor));
 
         const pill = document.createElement("div");
-        pill.className = "task-pill";
+        pill.className = `task-pill${hasColor ? "" : " no-color"}`;
 
         const text = document.createElement("div");
         text.className = "task-text";
@@ -1323,32 +1346,28 @@
 
         const swatch = document.createElement("div");
         swatch.className = "color-swatch";
-        swatch.innerHTML = `
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none">
-            <path d="M14.7 4.3l5 5M5.5 18.5l3.1-.7 9.8-9.8a1.8 1.8 0 0 0 0-2.6l-.8-.8a1.8 1.8 0 0 0-2.6 0l-9.8 9.8-.7 3.1Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M4.8 19.2c.8-.1 1.4.1 1.9.6.5.5.7 1.1.6 1.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-        `;
-        let selectedColor = settings.reminderDefault;
-        swatch.style.setProperty("--task-brush-color", selectedColor);
+        let selectedColor = null;
+        swatch.style.setProperty("--task-brush-color", "#ffffff");
 
         colorWrap.addEventListener("click", () => {
           openColorPicker(selectedColor, color => {
-            selectedColor = color;
-            swatch.style.setProperty("--task-brush-color", color);
+            selectedColor = color || null;
+            swatch.style.setProperty("--task-brush-color", selectedColor || "#ffffff");
           });
         });
 
         const input = document.createElement("input");
         input.type = "text";
         input.className = "task-input";
-        input.placeholder = "Add something";
+        input.placeholder = "";
+        input.setAttribute("aria-label", "Add an item");
         input.maxLength = 240;
 
         const button = document.createElement("button");
         button.type = "submit";
         button.className = "add-button";
-        button.textContent = "Add";
+        button.textContent = "✓";
+        button.setAttribute("aria-label", "Save item");
 
         form.addEventListener("submit", event => {
           event.preventDefault();
@@ -1363,7 +1382,7 @@
             createdAt: new Date().toISOString()
           });
 
-          recordColorUse(selectedColor);
+          if (selectedColor) recordColorUse(selectedColor);
           saveData();
           render();
         });
@@ -1374,6 +1393,7 @@
       }
 
       function recordColorUse(color) {
+        if (!color) return;
         const normalized = String(color).toLowerCase();
         settings.colorUsage[normalized] = (settings.colorUsage[normalized] || 0) + 1;
         saveSettings();
@@ -1393,10 +1413,11 @@
       }
 
       function openColorPicker(initialColor, callback) {
-        activeColorSelection = initialColor || settings.reminderDefault;
+        activeColorSelection = initialColor || null;
         activeColorCallback = callback;
-        el.customReminderColor.value = activeColorSelection;
-        el.customColorPreview.style.setProperty("--custom-preview", activeColorSelection);
+        const previewColor = activeColorSelection || settings.reminderDefault;
+        el.customReminderColor.value = previewColor;
+        el.customColorPreview.style.setProperty("--custom-preview", previewColor);
         renderColorChoices();
         el.colorPickerModal.classList.add("open");
       }
@@ -1414,13 +1435,29 @@
         el.recentColors.innerHTML = "";
         el.presetColors.innerHTML = "";
 
-        getMostUsedColors().forEach(color => {
+        el.recentColors.appendChild(createNoColorButton());
+        getMostUsedColors().slice(0, 4).forEach(color => {
           el.recentColors.appendChild(createPaletteButton(color));
         });
 
         presetReminderColors.forEach(color => {
           el.presetColors.appendChild(createPaletteButton(color));
         });
+      }
+
+      function createNoColorButton() {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "palette-color no-color";
+        button.setAttribute("aria-label", "Use no color");
+        button.classList.toggle("selected", activeColorSelection === null);
+
+        button.addEventListener("click", () => {
+          activeColorSelection = null;
+          renderColorChoices();
+        });
+
+        return button;
       }
 
       function createPaletteButton(color) {
@@ -1431,7 +1468,7 @@
         button.setAttribute("aria-label", `Choose ${color}`);
         button.classList.toggle(
           "selected",
-          color.toLowerCase() === activeColorSelection.toLowerCase()
+          Boolean(activeColorSelection) && color.toLowerCase() === activeColorSelection.toLowerCase()
         );
 
         button.addEventListener("click", () => {
@@ -1475,9 +1512,12 @@
           } else {
             tasks.forEach(task => {
               const card = document.createElement("div");
-              card.className = `week-task${task.completed ? " completed" : ""}`;
-              card.style.setProperty("--task-color", task.color || settings.reminderDefault);
-              card.style.setProperty("--task-text-color", getContrastTextColor(task.color || settings.reminderDefault));
+              const hasColor = Boolean(task.color);
+              card.className = `week-task${hasColor ? "" : " no-color"}${task.completed ? " completed" : ""}`;
+              if (hasColor) {
+                card.style.setProperty("--task-color", task.color);
+                card.style.setProperty("--task-text-color", getContrastTextColor(task.color));
+              }
 
               const text = document.createElement("span");
               text.textContent = task.text;
@@ -1531,9 +1571,12 @@
 
           getTasks(day).forEach(task => {
             const item = document.createElement("div");
-            item.className = `month-task${task.completed ? " completed" : ""}`;
-            item.style.setProperty("--task-color", task.color || settings.reminderDefault);
-            item.style.setProperty("--task-text-color", getContrastTextColor(task.color || settings.reminderDefault));
+            const hasColor = Boolean(task.color);
+            item.className = `month-task${hasColor ? "" : " no-color"}${task.completed ? " completed" : ""}`;
+            if (hasColor) {
+              item.style.setProperty("--task-color", task.color);
+              item.style.setProperty("--task-text-color", getContrastTextColor(task.color));
+            }
             item.textContent = task.text;
             cell.appendChild(item);
           });
@@ -1613,8 +1656,7 @@
         [el.surfaceColor, "surface"],
         [el.textColor, "text"],
         [el.mutedTextColor, "muted"],
-        [el.accentColor, "accent"],
-        [el.defaultReminderColor, "reminderDefault"]
+        [el.accentColor, "accent"]
       ];
 
       settingBindings.forEach(([input, key]) => {
