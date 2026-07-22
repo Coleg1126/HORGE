@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#000000" />
-  <title>Daylist Planner — Fixed</title>
+  <title>Daylist Planner — Weekly Day View</title>
   <style>
     :root {
       --page-bg: #000000;
@@ -823,6 +823,12 @@
         padding-block: 20px;
       }
 
+      /* iPhone Safari zooms focused inputs below 16px. At the page's 0.85 scale,
+         19px remains just over 16px visually and prevents that automatic zoom. */
+      .task-input {
+        font-size: 19px;
+      }
+
       .delete-button {
         width: 30px;
         opacity: .65;
@@ -1131,6 +1137,7 @@
       let currentMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
       let activeColorSelection = null;
       let activeColorCallback = null;
+      let dayViewScrollMode = "today";
 
       normalizeTasks();
       applySettings();
@@ -1140,9 +1147,10 @@
         return new Date(date.getFullYear(), date.getMonth(), date.getDate());
       }
 
-      function startOfWeek(date) {
+      function startOfMondayWeek(date) {
         const d = startOfDay(date);
-        d.setDate(d.getDate() - d.getDay());
+        const daysSinceMonday = (d.getDay() + 6) % 7;
+        d.setDate(d.getDate() - daysSinceMonday);
         return d;
       }
 
@@ -1290,13 +1298,14 @@
         updateTitle();
         el.dayView.innerHTML = "";
 
-        const start = selectedDate;
-        const daysToShow = 14;
+        const weekStart = startOfMondayWeek(selectedDate);
+        const today = startOfDay(new Date());
 
-        for (let i = 0; i < daysToShow; i++) {
-          const day = addDays(start, i);
+        for (let i = 0; i < 7; i++) {
+          const day = addDays(weekStart, i);
           const section = document.createElement("section");
-          section.className = `day-section${isSameDay(day, new Date()) ? " today" : ""}`;
+          section.className = `day-section${isSameDay(day, today) ? " today" : ""}`;
+          section.dataset.date = dateKey(day);
 
           const heading = document.createElement("div");
           heading.className = "day-heading";
@@ -1327,6 +1336,37 @@
           section.append(heading, divider, tasksContainer, addRow);
           el.dayView.appendChild(section);
         }
+
+        positionDayView(weekStart, today);
+      }
+
+      function positionDayView(weekStart, today) {
+        const mode = dayViewScrollMode;
+        dayViewScrollMode = null;
+        if (!mode) return;
+
+        let targetDay = weekStart;
+        const weekEnd = addDays(weekStart, 6);
+        const todayIsInWeek = today >= weekStart && today <= weekEnd;
+
+        if (mode === "selected") {
+          targetDay = selectedDate;
+        } else if (mode === "today" && todayIsInWeek) {
+          targetDay = today;
+        }
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const target = el.dayView.querySelector(`[data-date="${dateKey(targetDay)}"]`)
+              || el.dayView.querySelector(".day-section");
+            if (!target) return;
+
+            const topbar = document.querySelector(".topbar");
+            const topbarHeight = topbar ? topbar.getBoundingClientRect().height : 0;
+            const targetTop = target.getBoundingClientRect().top + window.scrollY - topbarHeight - 8;
+            window.scrollTo({ top: Math.max(0, targetTop), behavior: "auto" });
+          });
+        });
       }
 
       function createTaskRow(day, task) {
@@ -1573,8 +1613,8 @@
               card.addEventListener("click", () => {
                 selectedDate = day;
                 currentView = "day";
+                dayViewScrollMode = "selected";
                 render();
-                window.scrollTo({ top: 0, behavior: "smooth" });
               });
               column.appendChild(card);
             });
@@ -1632,8 +1672,8 @@
             selectedDate = day;
             currentMonth = new Date(day.getFullYear(), day.getMonth(), 1);
             currentView = "day";
+            dayViewScrollMode = "selected";
             render();
-            window.scrollTo({ top: 0, behavior: "smooth" });
           });
 
           grid.appendChild(cell);
@@ -1650,12 +1690,15 @@
           selectedDate = addDays(selectedDate, direction * 7);
           currentMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
         } else {
-          selectedDate = addDays(selectedDate, direction * 7);
+          selectedDate = addDays(startOfMondayWeek(selectedDate), direction * 7);
           currentMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+          dayViewScrollMode = "top";
         }
 
         render();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        if (currentView !== "day") {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
       }
 
       function openSettings() {
@@ -1680,9 +1723,16 @@
           currentView = button.dataset.view;
           if (currentView === "month") {
             currentMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+          } else if (currentView === "day") {
+            const today = startOfDay(new Date());
+            selectedDate = today;
+            currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            dayViewScrollMode = "today";
           }
           render();
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          if (currentView !== "day") {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }
         });
       });
 
@@ -1762,9 +1812,16 @@
         currentView = viewOrder[nextIndex];
         if (currentView === "month") {
           currentMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        } else if (currentView === "day") {
+          const today = startOfDay(new Date());
+          selectedDate = today;
+          currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+          dayViewScrollMode = "today";
         }
         render();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        if (currentView !== "day") {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
       }, { passive: true });
 
       el.clearAllButton.addEventListener("click", () => {
